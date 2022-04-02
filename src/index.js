@@ -15,9 +15,11 @@ import { configurations } from '../config.js'
 logInfo("ENV_TEST", process.env.ENV_TEST)
 
 const binancePairs = configurations.filter(x => x.type === "binance").map(x => x.pair)
+const huobiPairs = configurations.filter(x => x.type === "huobi").map(x => x.pair)
 const yahooQueries = configurations.filter(x => x.type === "yahoo").map(x => x.pair)
 
 logInfo("binancePairs", binancePairs)
+logInfo("huobiPairs", huobiPairs)
 logInfo("yahooQueries", yahooQueries)
 
 const REFRESH_INTERVAL = 60000
@@ -29,10 +31,55 @@ const binance = new ccxt.binance()
  */
 let binanceQuotes = {}
 
+const huobi = new ccxt.huobi()
+/**
+ * @type {ccxt.Dictionary<ccxt.Ticker>}
+ */
+let huobiQuotes = {}
+
 /**
  * @type {import('yahoo-finance2/dist/esm/src/modules/quote').Quote[]}
  */
 let yahooQuotes = []
+
+/**
+ * 
+ * @param {ccxt.Dictionary<ccxt.Ticker>} target 
+ * @param {string} pair 
+ */
+async function ccxtPrice(target, pair)
+{
+    const quote = target[pair]
+
+    if (!quote)
+    {
+        throw "quote not found in cctx driver: " + pair
+    }
+
+    return {
+        value: quote.last,
+        currency: quote.symbol,
+        timestamp: new Date(quote.timestamp),
+        raw: quote.info
+    }
+}
+
+/**
+ * @param {string} pair 
+ */
+async function binancePrice(pair)
+{
+    return await ccxtPrice(binanceQuotes, pair)
+}
+
+/**
+ * @param {string} pair 
+ */
+async function huobiPrice(pair)
+{
+    return await ccxtPrice(huobiQuotes, pair)
+}
+
 
 
 /**
@@ -62,26 +109,12 @@ async function yahooPrice(query)
     }
 }
 
-/**
- * @param {string} pair 
- */
-async function binancePrice(pair)
-{
-    const quote = binanceQuotes[pair]
-
-    return {
-        value: quote.last,
-        currency: quote.symbol,
-        timestamp: new Date(quote.timestamp),
-        raw: quote.info
-    }
-}
-
 async function priceDrivers()
 {
     try
     {
         binanceQuotes = await binance.fetchTickers(binancePairs)
+        huobiQuotes = await huobi.fetchTickers(huobiPairs)
         yahooQuotes = await yahooFinance.quote(yahooQueries)
 
         // logInfo("yahooQuotes", yahooQuotes)
@@ -112,23 +145,43 @@ void (async () =>
             }
             const notification = new Webhook(config.secrets.discord)
 
-            if (config.type === "binance")
+            switch (config.type)
             {
-                watchers.push(await new WatcherPrice(
-                    config.pair,
-                    async (context) => await alertDiscord(context, notification),
-                    async () => await binancePrice(config.pair),
-                    ALERT_THRESHOLD
-                ).init())
-            }
-            else if (config.type === "yahoo")
-            {
-                watchers.push(await new WatcherPrice(
-                    yahooQuotes.find(x => x.symbol === config.pair).displayName ?? yahooQuotes.find(x => x.symbol === config.pair).shortName ?? config.pair,
-                    async (context) => await alertDiscord(context, notification),
-                    async () => await yahooPrice(config.pair),
-                    ALERT_THRESHOLD
-                ).init())
+                case "binance":
+                    {
+                        watchers.push(await new WatcherPrice(
+                            config.pair,
+                            async (context) => await alertDiscord(context, notification),
+                            async () => await binancePrice(config.pair),
+                            ALERT_THRESHOLD
+                        ).init())
+                    }
+                    break
+
+                case "huobi":
+                    {
+                        watchers.push(await new WatcherPrice(
+                            config.pair,
+                            async (context) => await alertDiscord(context, notification),
+                            async () => await huobiPrice(config.pair),
+                            ALERT_THRESHOLD
+                        ).init())
+                    }
+                    break
+
+                case "yahoo":
+                    {
+                        watchers.push(await new WatcherPrice(
+                            yahooQuotes.find(x => x.symbol === config.pair).displayName ?? yahooQuotes.find(x => x.symbol === config.pair).shortName ?? config.pair,
+                            async (context) => await alertDiscord(context, notification),
+                            async () => await yahooPrice(config.pair),
+                            ALERT_THRESHOLD
+                        ).init())
+                    }
+                    break
+
+                default:
+                    throw "unknown config type: " + config.type
             }
         }
     }

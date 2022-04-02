@@ -8,6 +8,8 @@ export const configurations = [
     new Configuration("DOGE/USDT", "binance", { notificationType: "discord" }, { discord: process.env.DISCORDWH_GENERAL }),
     new Configuration("SC/USDT", "binance", { notificationType: "discord" }, { discord: process.env.DISCORDWH_GENERAL }),
 
+    new Configuration("XCH/USDT", "huobi", { notificationType: "discord" }, { discord: process.env.DISCORDWH_GENERAL }),
+
     new Configuration("C6L.SI", "yahoo", { notificationType: "discord" }, { discord: process.env.DISCORDWH_GENERAL }),
     new Configuration("C07.SI", "yahoo", { notificationType: "discord" }, { discord: process.env.DISCORDWH_GENERAL }),
     new Configuration("NVDA", "yahoo", { notificationType: "discord" }, { discord: process.env.DISCORDWH_GENERAL }),
