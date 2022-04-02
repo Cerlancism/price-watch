@@ -7,7 +7,7 @@ import { Webhook } from 'discord-webhook-node';
 import { logInfo, logError } from './watcher/Logger.js';
 import { Watcher } from './watcher/Watcher.js';
 import { WatcherPrice } from './watcher/WatcherPrice.js';
-import { alertDiscord } from './notifcation/discordWebhook.js';
+import { alertDiscord } from './notification/discordWebhook.js';
 import { configurations } from '../config.js'
 
 // logInfo("Config", configurations)
