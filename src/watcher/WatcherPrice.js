@@ -3,7 +3,13 @@
 import { EdgeValue } from "./EdgeValues.js";
 import { Watcher } from "./Watcher.js";
 
-const RETRY_TIMEOUT = 5000
+/**
+ * @param {number} n 
+ */
+function padPercent(n)
+{
+    return `${n.toLocaleString("en", { style: "percent", maximumFractionDigits: 2, minimumFractionDigits: 2 })}`.padEnd(7, " ")
+}
 
 export class WatcherPrice extends Watcher
 {
@@ -29,10 +35,6 @@ export class WatcherPrice extends Watcher
 
         this.currency = ""
         this.identity = identity
-        this.sessionHigh = new EdgeValue()
-        this.sessionLow = new EdgeValue()
-        this.previous = new EdgeValue()
-        this.current = new EdgeValue()
         this.raw = null
         this.threshold = threshold
 
@@ -49,16 +51,24 @@ export class WatcherPrice extends Watcher
         {
             const latest = await this._providers.price()
             this.currency = latest.currency
-            this.logInfo("Init", this.identity.padEnd(10, " "), `${latest.value.toLocaleString("en", { maximumFractionDigits: 4, minimumFractionDigits: 4 })}`.padStart(12, " "), this.currency)
-            this.resetAll(latest.value)
+            this.logInfo(
+                "Init",
+                this.identity.padEnd(10, " "),
+                latest.timestamp,
+                `${latest.value.toLocaleString("en", { maximumFractionDigits: 4, minimumFractionDigits: 4 })}`.padStart(12, " "),
+                this.currency
+            )
+            const { value, timestamp } = latest
+            this.current = new EdgeValue(this.identity, "current", () => ({ value, timestamp }))
+            this.previous = new EdgeValue(this.identity, "previous", () => ({ value, timestamp }))
+            this.sessionHigh = new EdgeValue(this.identity, "high", () => ({ value, timestamp }))
+            this.sessionLow = new EdgeValue(this.identity, "low", () => ({ value, timestamp }))
             return this
         }
         catch (error)
         {
             this.logError("Init Failure", this.identity, error)
-            await this.sleep(RETRY_TIMEOUT)
-            this.logError("Init Retry", this.identity)
-            return this.init()
+            throw error
         }
     }
 
@@ -79,7 +89,7 @@ export class WatcherPrice extends Watcher
     {
         const value = this.current.value
         const diff = value / this.previous.value
-        this.logInfo("Check", this.identity.padEnd(10, " "), value.toFixed(8).padStart(16, " "), this.currency.padEnd(10, " "), `${diff.toLocaleString("en", { style: "percent", maximumFractionDigits: 2, minimumFractionDigits: 2 })}`.padEnd(7, " "), this.current.timestamp.toLocaleString())
+        // this.logInfo("Check", this.identity.padEnd(10, " "), value.toFixed(8).padStart(16, " "), this.currency.padEnd(10, " "), `${diff.toLocaleString("en", { style: "percent", maximumFractionDigits: 2, minimumFractionDigits: 2 })}`.padEnd(7, " "), this.current.timestamp.toLocaleString())
 
         if (Math.abs(1 - diff) >= this.threshold)
         {
@@ -90,12 +100,12 @@ export class WatcherPrice extends Watcher
             if (value > this.sessionHigh.value)
             {
                 this.sessionHigh.update(value)
-                this.logInfo("Session Highest 🟢", this.identity, this.sessionHigh.value)
+                this.logInfo("Session Highest 🟢", this.identity.padEnd(10, " "), padPercent(diff), this.sessionHigh.value)
             }
             else if (value < this.sessionLow.value)
             {
                 this.sessionLow.update(value)
-                this.logInfo("Session Lowest  🔴", this.identity, this.sessionLow.value)
+                this.logInfo("Session Lowest  🔴", this.identity.padEnd(10, " "), padPercent(diff), this.sessionLow.value)
             }
         }
 

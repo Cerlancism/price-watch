@@ -9,38 +9,56 @@ import { Watcher } from './watcher/Watcher.js';
 import { WatcherPrice } from './watcher/WatcherPrice.js';
 import { alertDiscord } from './notification/discordWebhook.js';
 import { configurations } from '../config.js'
+import { PriceDriver } from './PriceDriver.js';
+
+const REFRESH_INTERVAL = 60000
+const ALERT_THRESHOLD = 0.025
 
 // logInfo("Config", configurations)
 
 logInfo("ENV_TEST", process.env.ENV_TEST)
 
-const binancePairs = configurations.filter(x => x.type === "binance").map(x => x.pair)
-const huobiPairs = configurations.filter(x => x.type === "huobi").map(x => x.pair)
-const yahooQueries = configurations.filter(x => x.type === "yahoo").map(x => x.pair)
 
-logInfo("binancePairs", binancePairs)
-logInfo("huobiPairs", huobiPairs)
-logInfo("yahooQueries", yahooQueries)
+const sourceTypes = configurations.map(x => x.type).filter((v, i, a) => a.indexOf(v) === i)
 
-const REFRESH_INTERVAL = 60000
-const ALERT_THRESHOLD = 0.025
+logInfo("Sources", sourceTypes)
 
-const binance = new ccxt.binance()
-/**
- * @type {ccxt.Dictionary<ccxt.Ticker>}
- */
-let binanceQuotes = {}
+const pricePairs = new Map()
 
-const huobi = new ccxt.huobi()
-/**
- * @type {ccxt.Dictionary<ccxt.Ticker>}
- */
-let huobiQuotes = {}
+for (const source of sourceTypes)
+{
+    const set = configurations.filter(x => x.type === source).map(x => x.pair)
+    pricePairs.set(source, configurations.filter(x => x.type === source).map(x => x.pair))
+    logInfo("Pair", source, set)
+}
 
 /**
- * @type {import('yahoo-finance2/dist/esm/src/modules/quote').Quote[]}
+ * @param {string} key
  */
-let yahooQuotes = []
+function buildcctxDriver(key)
+{
+    return new PriceDriver(
+        /** @type {ccxt.Exchange} */(new ccxt[key]()),
+        async (x) => await x.fetchTickers(pricePairs.get(key)),
+        key
+    );
+}
+
+/**
+ * @param {string} key
+ */
+function buildYahooDriver(key)
+{
+    return new PriceDriver(
+        yahooFinance,
+        async (x) => await x.quote(pricePairs.get(key)),
+        key
+    );
+}
+
+const binanceDriver = buildcctxDriver("binance")
+const huobiDriver = buildcctxDriver("huobi")
+const yahooDriver = buildYahooDriver("yahoo")
 
 /**
  * 
@@ -69,7 +87,7 @@ async function ccxtPrice(target, pair)
  */
 async function binancePrice(pair)
 {
-    return await ccxtPrice(binanceQuotes, pair)
+    return await ccxtPrice(await binanceDriver.retrieve(), pair)
 }
 
 /**
@@ -77,7 +95,7 @@ async function binancePrice(pair)
  */
 async function huobiPrice(pair)
 {
-    return await ccxtPrice(huobiQuotes, pair)
+    return await ccxtPrice(await huobiDriver.retrieve(), pair)
 }
 
 
@@ -87,6 +105,7 @@ async function huobiPrice(pair)
  */
 async function yahooPrice(query)
 {
+    const yahooQuotes = await yahooDriver.retrieve()
     const quote = yahooQuotes.find(x => x.symbol === query)
     const { regularMarketPrice, currency, regularMarketTime, exchange, displayName, shortName, sourceInterval, symbol } = quote;
 
@@ -113,11 +132,11 @@ async function priceDrivers()
 {
     try
     {
-        binanceQuotes = await binance.fetchTickers(binancePairs)
-        huobiQuotes = await huobi.fetchTickers(huobiPairs)
-        yahooQuotes = await yahooFinance.quote(yahooQueries)
-
-        // logInfo("yahooQuotes", yahooQuotes)
+        await Promise.all([
+            binanceDriver.refresh(),
+            huobiDriver.refresh(),
+            yahooDriver.refresh()
+        ])
     }
     catch (error)
     {
@@ -133,6 +152,8 @@ const watchers = []
 void (async () =>
 {
     await priceDrivers()
+
+    const yahooQuotes = await yahooDriver.retrieve()
 
     for (const config of configurations)
     {
@@ -171,8 +192,9 @@ void (async () =>
 
                 case "yahoo":
                     {
+                        const quote = yahooQuotes.find(x => x.symbol === config.pair)
                         watchers.push(await new WatcherPrice(
-                            yahooQuotes.find(x => x.symbol === config.pair).displayName ?? yahooQuotes.find(x => x.symbol === config.pair).shortName ?? config.pair,
+                            quote.displayName ?? quote.shortName ?? config.pair,
                             async (context) => await alertDiscord(context, notification),
                             async () => await yahooPrice(config.pair),
                             ALERT_THRESHOLD
@@ -196,3 +218,4 @@ void (async () =>
         }
     }, REFRESH_INTERVAL)
 })()
+

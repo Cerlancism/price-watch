@@ -1,16 +1,43 @@
 //@ts-check
 
-export class EdgeValue
+import { LocalStorage } from "node-localstorage"
+import { Loggable } from "./Logger.js"
+
+const localStorage = new LocalStorage("./storage")
+
+export class EdgeValue extends Loggable
 {
     /**
-     * @param {number} [init]
+     * @param {string} identity
+     * @param {"current" | "previous" | "high" | "low"} type
+     * @param {() => ({value: number, timestamp: Date})} initialiser 
      */
-    constructor(init, timestamp = new Date())
+    constructor(identity, type, initialiser)
     {
-        if (init)
+        super()
+
+        this._identity = identity
+        this.type = type
+
+        const raw = localStorage.getItem(this.key)
+
+        if (!raw)
         {
-            this.update(init, timestamp)
+            const init = initialiser()
+            this.logInfo("EdgeValue - New", init)
+            this.update(init.value, init.timestamp)
         }
+        else
+        {
+            const retrived = JSON.parse(raw)
+            this.logInfo("EdgeValue - Revive", retrived)
+            this.update(retrived.value, retrived.timestamp)
+        }
+    }
+
+    get key()
+    {
+        return `edge-value-${this._identity}-${this.type}.json`
     }
 
     /**
@@ -22,6 +49,8 @@ export class EdgeValue
     {
         this.value = value
         this.timestamp = timestamp
+
+        localStorage.setItem(this.key, JSON.stringify(this))
     }
 }
 
