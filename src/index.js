@@ -107,6 +107,12 @@ async function yahooPrice(query)
 {
     const yahooQuotes = await yahooDriver.retrieve()
     const quote = yahooQuotes.find(x => x.symbol === query)
+
+    if (!quote)
+    {
+        throw `yahooQuote: ${query} - not available`
+    }
+
     const { regularMarketPrice, currency, regularMarketTime, exchange, displayName, shortName, sourceInterval, symbol } = quote;
 
     // logInfo("Quote", quote)

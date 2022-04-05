@@ -1,8 +1,7 @@
 //@ts-check
-import { LocalStorage } from 'node-localstorage';
 import { Loggable } from './watcher/Logger.js';
 
-const localStorage = new LocalStorage("./storage")
+
 /**
  * @template U
  * @template T
@@ -32,14 +31,7 @@ export class PriceDriver extends Loggable
      */
     async retrieve()
     {
-        const raw = localStorage.getItem(this.key)
-
-        if (!raw)
-        {
-            throw "Cache missing: " + this.key
-        }
-
-        return JSON.parse(raw)
+        return this.value
     }
 
     async refresh()
@@ -51,9 +43,7 @@ export class PriceDriver extends Loggable
     {
         try
         {
-            const source = await this._getter(this._provider)
-            const raw = JSON.stringify(source, undefined, 2)
-            localStorage.setItem(this.key, raw)
+            this.value = await this._getter(this._provider)
         }
         catch (error)
         {
