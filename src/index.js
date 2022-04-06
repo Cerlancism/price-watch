@@ -11,13 +11,12 @@ import { alertDiscord } from './notification/discordWebhook.js';
 import { configurations } from '../config.js'
 import { PriceDriver } from './PriceDriver.js';
 
-const REFRESH_INTERVAL = 60000
-const ALERT_THRESHOLD = 0.025
+const DEFAULT_REFRESH_INTERVAL = 60000
+const DEFAULT_ALERT_THRESHOLD = 0.025
 
 // logInfo("Config", configurations)
 
 logInfo("ENV_TEST", process.env.ENV_TEST)
-
 
 const sourceTypes = configurations.map(x => x.type).filter((v, i, a) => a.indexOf(v) === i)
 
@@ -97,8 +96,6 @@ async function huobiPrice(pair)
 {
     return await ccxtPrice(await huobiDriver.retrieve(), pair)
 }
-
-
 
 /**
  * @param {string} query
@@ -180,7 +177,7 @@ void (async () =>
                             config.pair,
                             async (context) => await alertDiscord(context, notification),
                             async () => await binancePrice(config.pair),
-                            ALERT_THRESHOLD
+                            DEFAULT_ALERT_THRESHOLD
                         ).init())
                     }
                     break
@@ -191,7 +188,7 @@ void (async () =>
                             config.pair,
                             async (context) => await alertDiscord(context, notification),
                             async () => await huobiPrice(config.pair),
-                            ALERT_THRESHOLD
+                            DEFAULT_ALERT_THRESHOLD
                         ).init())
                     }
                     break
@@ -203,7 +200,7 @@ void (async () =>
                             quote.displayName ?? quote.shortName ?? config.pair,
                             async (context) => await alertDiscord(context, notification),
                             async () => await yahooPrice(config.pair),
-                            ALERT_THRESHOLD
+                            config.settings.threshold ?? DEFAULT_ALERT_THRESHOLD
                         ).init())
                     }
                     break
@@ -211,6 +208,10 @@ void (async () =>
                 default:
                     throw "unknown config type: " + config.type
             }
+        }
+        else
+        {
+            throw "Unknown notificationType: " + config.settings.notificationType
         }
     }
 
@@ -222,6 +223,6 @@ void (async () =>
         {
             await watcher.refresh()
         }
-    }, REFRESH_INTERVAL)
+    }, DEFAULT_REFRESH_INTERVAL)
 })()
 

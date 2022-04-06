@@ -1,9 +1,15 @@
+/**
+ * @typedef {Object} ConfigurationSettings
+ * @property {string} notificationType
+ * @property {number} [threshold]
+ */
+
 export class Configuration
 {
     /**
      * @param {string} pair 
      * @param {string} type
-     * @param {{[key in string]: string}} settings 
+     * @param {ConfigurationSettings} settings 
      * @param {{[key in string]: string}} secrets 
      */
     constructor(pair, type, settings, secrets)
