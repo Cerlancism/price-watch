@@ -91,22 +91,21 @@ export class WatcherPrice extends Watcher
         const diff = value / this.previous.value
         // this.logInfo("Check", this.identity.padEnd(10, " "), value.toFixed(8).padStart(16, " "), this.currency.padEnd(10, " "), `${diff.toLocaleString("en", { style: "percent", maximumFractionDigits: 2, minimumFractionDigits: 2 })}`.padEnd(7, " "), this.current.timestamp.toLocaleString())
 
+        if (value > this.sessionHigh.value)
+        {
+            this.sessionHigh.update(value)
+            this.logInfo("Session Highest 🟢", this.identity.padEnd(10, " "), padPercent(diff), this.sessionHigh.value)
+        }
+        else if (value < this.sessionLow.value)
+        {
+            this.sessionLow.update(value)
+            this.logInfo("Session Lowest  🔴", this.identity.padEnd(10, " "), padPercent(diff), this.sessionLow.value)
+        }
+        
+
         if (Math.abs(1 - diff) >= this.threshold)
         {
             return true
-        }
-        else
-        {
-            if (value > this.sessionHigh.value)
-            {
-                this.sessionHigh.update(value)
-                this.logInfo("Session Highest 🟢", this.identity.padEnd(10, " "), padPercent(diff), this.sessionHigh.value)
-            }
-            else if (value < this.sessionLow.value)
-            {
-                this.sessionLow.update(value)
-                this.logInfo("Session Lowest  🔴", this.identity.padEnd(10, " "), padPercent(diff), this.sessionLow.value)
-            }
         }
 
         return false

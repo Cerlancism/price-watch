@@ -9,14 +9,16 @@ import { WatcherPrice } from '../watcher/WatcherPrice.js'
  */
 export async function alertDiscord(context, notification, name = context.identity)
 {
-    const percent = `${(context.current.value / context.previous.value - 1).toLocaleString("en", { style: "percent", maximumFractionDigits: 2 })}`
-    context.logInfo("Notification", context.identity, name, context.previous, context.current, percent)
+    const riseFall = context.current.value > context.previous.value
+    const against = riseFall ? context.sessionLow : context.sessionHigh
+    const percent = `${(context.current.value / against.value - 1).toLocaleString("en", { style: "percent", maximumFractionDigits: 2 })}`
+    context.logInfo("Notification", context.identity, name, context.previous, context.current, against, percent)
 
     notification.setUsername(name + " Price")
 
-    const text = (context.current.value > context.previous.value ? "🟢" : "🔴")
+    const text = (riseFall ? "🟢" : "🔴")
         + ` ${percent}`
-        + ` \`${context.previous.value.toFixed(8)}\` -> \`${context.current.value.toFixed(8)}\` \`${context.currency}\``
+        + ` \`${against.value.toFixed(8)}\` -> \`${context.current.value.toFixed(8)}\` \`${context.currency}\``
 
     const embed = new MessageBuilder()
         .setText(text)
@@ -34,7 +36,7 @@ export async function alertDiscord(context, notification, name = context.identit
 
     embed.setFooter("Last Edge")
     // @ts-ignore
-    embed.setTimestamp(context.previous.timestamp)
+    embed.setTimestamp(against.timestamp)
 
     await notification.send(embed)
 }

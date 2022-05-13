@@ -21,11 +21,16 @@ const REFRESH_INTERVAL = 60000
 
 void (async () =>
 {
-    const sourceTypes = configurations.map(x => x.type).filter((v, i, a) => a.indexOf(v) === i)
+    // const sourceTypes = configurations.map(x => x.type).filter((v, i, a) => a.indexOf(v) === i)
 
 
-    // console.log(await yahooFinance.quote("GC=F"))
+    // console.log(await yahooFinance.quote("O39.SI"))
 
-    console.log(await yahooFinance.quoteSummary("APPL"))
+    const cctx = new ccxt.ftx()
+
+    console.log(await cctx.fetchTickers(["LUNA/USD"]))
+
+    // console.log(await yahooFinance.quoteSummary("APPL"))
+
 })()
 

@@ -38,7 +38,7 @@ function buildcctxDriver(key)
 {
     return new PriceDriver(
         /** @type {ccxt.Exchange} */(new ccxt[key]()),
-        async (x) => await x.fetchTickers(pricePairs.get(key)),
+        async (x) => await x.fetchTickers(pricePairs.get(key) ?? []),
         key
     );
 }
@@ -50,13 +50,14 @@ function buildYahooDriver(key)
 {
     return new PriceDriver(
         yahooFinance,
-        async (x) => await x.quote(pricePairs.get(key)),
+        async (x) => await x.quote(pricePairs.get(key) ?? []),
         key
     );
 }
 
 const binanceDriver = buildcctxDriver("binance")
 const huobiDriver = buildcctxDriver("huobi")
+const ftxDriver = buildcctxDriver("ftx")
 const yahooDriver = buildYahooDriver("yahoo")
 
 /**
@@ -95,6 +96,14 @@ async function binancePrice(pair)
 async function huobiPrice(pair)
 {
     return await ccxtPrice(await huobiDriver.retrieve(), pair)
+}
+
+/**
+ * @param {string} pair 
+ */
+async function ftxPrice(pair)
+{
+    return await ccxtPrice(await ftxDriver.retrieve(), pair)
 }
 
 /**
@@ -138,7 +147,8 @@ async function priceDrivers()
         await Promise.all([
             binanceDriver.refresh(),
             huobiDriver.refresh(),
-            yahooDriver.refresh()
+            yahooDriver.refresh(),
+            ftxDriver.refresh()
         ])
     }
     catch (error)
@@ -177,7 +187,7 @@ void (async () =>
                             config.pair,
                             async (context) => await alertDiscord(context, notification),
                             async () => await binancePrice(config.pair),
-                            DEFAULT_ALERT_THRESHOLD
+                            config.settings.threshold ?? DEFAULT_ALERT_THRESHOLD
                         ).init())
                     }
                     break
@@ -188,7 +198,18 @@ void (async () =>
                             config.pair,
                             async (context) => await alertDiscord(context, notification),
                             async () => await huobiPrice(config.pair),
-                            DEFAULT_ALERT_THRESHOLD
+                            config.settings.threshold ?? DEFAULT_ALERT_THRESHOLD
+                        ).init())
+                    }
+                    break
+                
+                case "ftx":
+                    {
+                        watchers.push(await new WatcherPrice(
+                            config.pair,
+                            async (context) => await alertDiscord(context, notification),
+                            async () => await ftxPrice(config.pair),
+                            config.settings.threshold ?? DEFAULT_ALERT_THRESHOLD
                         ).init())
                     }
                     break
@@ -196,9 +217,10 @@ void (async () =>
                 case "yahoo":
                     {
                         const quote = yahooQuotes.find(x => x.symbol === config.pair)
+                        const displayName = quote.displayName ?? quote.shortName ?? config.pair
                         watchers.push(await new WatcherPrice(
-                            quote.displayName ?? quote.shortName ?? config.pair,
-                            async (context) => await alertDiscord(context, notification),
+                            config.pair,
+                            async (context) => await alertDiscord(context, notification, displayName),
                             async () => await yahooPrice(config.pair),
                             config.settings.threshold ?? DEFAULT_ALERT_THRESHOLD
                         ).init())
